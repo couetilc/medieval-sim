@@ -1,0 +1,7 @@
+#world {
+  display: grid;
+}
+
+.node {
+  background-color: green;
+}
