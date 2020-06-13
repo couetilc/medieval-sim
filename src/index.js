@@ -1,9 +1,15 @@
+// functions prefixed with "create" modify data
+//                    with "draw" modify the DOM
+
+
 // constants
 const nodeSize = '20px';
 const nodeGap = '5px';
 // parameters
-const worldSize = 4;
+const worldSize = 2;
 const speed = 1;
+// tracking
+let characterCount = 0;
 
 const allCharacters = ['wench', 'swain', 'baby'];
 
@@ -24,6 +30,7 @@ function createGrid(size) {
   for (let i = 0; i < size; i += 1) {
     for (let j = 0; j < size; j += 1) {
       const gridNode = document.createElement('div');
+
       gridNode.classList.add('node');
       gridNode.classList.add(`row-${i}`);
       gridNode.classList.add(`col-${j}`);
@@ -43,9 +50,9 @@ function createGrid(size) {
 function drawGrid(grid, size, atNode) {
   for (let i = 0; i < size; i += 1) {
     for (let j = 0; j < size; j += 1) {
-      console.log('(%o,%o) => %o', i, j, grid[idx(i, j)]);
+      // console.log('(%o,%o) => %o', i, j, grid[idx(i, j)]);
       atNode.appendChild(grid[idx(i, j)].node);
-      console.log(grid[idx(i, j)].node);
+      // console.log(grid[idx(i, j)].node);
     }
   }
 }
@@ -56,51 +63,90 @@ function clearGrid(atNode) {
   }
 }
 
-function nextGrid(worldGrid, worldSize) {
+// grid: the worldGrid
+// grid: the next worldGrid
+// row, col: the swain's current location in the worldGrid
+// @returns the change in number of characters
+function moveSwain(grid, nextGrid, row, col) {
+  // run through possible directions to move in random order
+  const directions = shuffle([0, 1, 2, 3]);
+  let nextDir = 4;
+  while (nextDir) {
+    nextDir -= 1;
+    const { row: nextRow, col: nextCol } = nextLoc(row, col, directions[nextDir]);
+    if (!isOccupied(grid, nextRow, nextCol, ['baby', 'swain']) && isInGrid(nextRow, nextCol)) {
+      // move
+      console.log(`swain moved to (${nextRow}, ${nextCol})`);
+      nextGrid[idx(nextRow, nextCol)].node.classList.add('swain');
+      break;
+    }
+  }
+  if (nextDir === 0) {
+    // did not find a new location
+    console.log(`swain died at (${row}, ${col})`);
+    characterCount -= 1;
+  }
+}
+
+// grid: the worldGrid
+// grid: the next worldGrid
+// row, col: the swain's current location in the worldGrid
+function moveWench(grid, nextGrid, row, col) {
+  // run through possible directions to move in random order
+  const directions = shuffle([0, 1, 2, 3]);
+  let nextDir = 4;
+  while (nextDir) {
+    nextDir -= 1;
+    const { row: nextRow, col: nextCol } = nextLoc(row, col, directions[nextDir]);
+    if (!isOccupied(grid, nextRow, nextCol, ['baby', 'wench']) && isInGrid(nextRow, nextCol)) {
+      // move
+      console.log(`wench moved to (${nextRow}, ${nextCol})`);
+      nextGrid[idx(nextRow, nextCol)].node.classList.add('wench');
+      break;
+    }
+  }
+  if (nextDir === 0) {
+    // did not find a new location
+    console.log(`wench died at (${row}, ${col})`);
+    characterCount -= 1;
+  }
+  return 0;
+}
+
+function createBaby(worldGrid, nextGrid, row, col) {
+  nextGrid[idx(row, col)].node.classList.add('baby');
+  console.log(`baby born at (${row}, ${col})`); 
+  characterCount += 1;
+  // swain and wench step to different grid nodes (but not one containing a baby)
+  // if they cannot step to a new node, they die
+  worldGrid[idx(row, col)].node.classList.remove('swain', 'wench');
+  characterCount -= 2; // parents die
+}
+
+function getNextGrid(worldGrid, worldSize) {
   const nextGrid = createGrid(worldSize);
   worldGrid.forEach(gridItem => {
-    console.log('gridItem', gridItem);
     const { node, row, col } = gridItem;
     // if is swain and wench, make a baby
     if (node.classList.contains('swain') && node.classList.contains('wench')) {
       // make a baby at the current grid node
-      node.classList.add('baby');
-      // swain and wench step to different grid nodes (but not one containing a baby)
-      node.classList.remove('swain', 'wench');
-      // pick a direction (0: N, 1: NE, 2: E, 3: SE, 4: S, 5: SW, 6: W, 7: NW)
-      // OR just 4 for now (0: N, 1: E, 2: S, 3: W)
-      const directions = shuffle([0, 1, 2, 3]);
-      const newIdx = idx(row, col);
-      // if they cannot step to a new node, they die
+      createBaby(worldGrid, nextGrid, row, col);
     }
     // if is swain, take a step
     else if (node.classList.contains('swain')) {
       // if it cannot step to a new node, it dies
       node.classList.remove('swain');
-      const directions = shuffle([0, 1, 2, 3]);
-      // run through possible directions to see if they can move
-      let nextDir = 4;
-      while (nextDir) {
-        nextDir -= 1;
-        const { row: nextRow, col: nextCol } = nextLoc(row, col, directions[nextDir]);
-        if (!isOccupied(worldGrid, nextRow, nextCol, ['baby', 'swain']) && isInGrid(nextRow, nextCol)) {
-          // move
-          console.log(`swain moved to (${nextRow}, ${nextCol})`)
-          nextGrid[idx(nextRow, nextCol)].node.classList.add('swain');
-          break;
-        }
-      }
-      if (nextDir === 0) {
-        // did not find a new location
-        console.log(`swain died at (${row}, ${col})`);
-      }
+      moveSwain(worldGrid, nextGrid, row, col);
     }
     // if is wench, take a step
     else if (node.classList.contains('wench')) {
       // if it cannot step to a new node, it dies
+      moveWench(worldGrid, nextGrid, row, col);
     }
     // if is baby, turn into swain or wench
     else if (node.classList.contains('baby')) {
+      characterCount -= 1; // baby dies without parents
+      console.log(`baby dies at (${row}, ${col})`); 
     }
     // if is nothing, ignore
     else {
@@ -121,13 +167,14 @@ function applyWorldStyles(node) {
 }
 
 function isOccupied(grid, row, col, characters = allCharacters) {
-  const nodeContains = (className) => grid[idx(row, col)]?.node?.classList.contains(className);
-  console.info('isOccuppied(%o, %o, %o) = %o', row, col, characters, characters.some(nodeContains));
+  if (!isInGrid(row, col)) { return false; }
+  const nodeContains = (className) => grid[idx(row, col)].node.classList.contains(className);
+  // console.info('isOccuppied(%o, %o, %o) = %o', row, col, characters, characters.some(nodeContains));
   return characters.some(nodeContains);
 }
 
 function isInGrid(row, col) {
-  console.log('isInGrid(%o, %o) = %o', row, col, row >= 0 && row < worldSize && col >= 0 && col < worldSize);
+  // console.log('isInGrid(%o, %o) = %o', row, col, row >= 0 && row < worldSize && col >= 0 && col < worldSize);
   return row >= 0 && row < worldSize &&
     col >= 0 && col < worldSize;
 }
@@ -146,8 +193,7 @@ function nextLoc(row, col, dir) {
   if (dir === 3) {
     return { row, col: col - 1 };
   }
-  console.warn('invalid direction', dir);
-  return { row, col };
+  throw new Error('invalid direction', dir);
 }
 
 // How about at the start: (Experiment #1)
@@ -171,22 +217,28 @@ function nextLoc(row, col, dir) {
 function init() {
   const worldNode = document.querySelector('#world');
   applyWorldStyles(worldNode);
-  // create board
+
+  // create and draw the simulation grid
   let worldGrid = createGrid(worldSize);
   drawGrid(worldGrid, worldSize, worldNode);
 
   // set up initial conditions of the world
   worldGrid[0].node.classList.add('swain');
   worldGrid[3].node.classList.add('wench');
+  characterCount += 2;
   // - at some point attach click handler for play/pause button
-  
+  let stepCount = 0;
+  let iid;
   // loop until no activity possible (setInterval?)
-  setInterval(() => {
+  iid = setInterval(() => {
+    console.log('\n[Step %o] (#char=%o)', stepCount++, characterCount);
     //    - calculate next moves
-    worldGrid = nextGrid(worldGrid, worldSize);
+    worldGrid = getNextGrid(worldGrid, worldSize);
     //    - execute next moves
     clearGrid(worldNode);
     drawGrid(worldGrid, worldSize, worldNode);
+    // if no characters left, no more moves are made
+    if (characterCount === 0) { clearInterval(iid); }
   }, 1000);
 }
 

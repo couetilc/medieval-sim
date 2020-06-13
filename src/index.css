@@ -16,6 +16,10 @@
   border-radius: 50%;
 }
 
+.swain.wench {
+  background-color: purple;
+}
+
 .baby {
   background-color: yellow;
   transform: rotate(45deg);
