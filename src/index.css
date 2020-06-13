@@ -5,3 +5,18 @@
 .node {
   background-color: green;
 }
+
+.swain {
+  background-color: red;
+  border-radius: 50%;
+}
+
+.wench {
+  background-color: blue;
+  border-radius: 50%;
+}
+
+.baby {
+  background-color: yellow;
+  transform: rotate(45deg);
+}
